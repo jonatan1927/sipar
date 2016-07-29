@@ -1,0 +1,205 @@
+ 
+SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
+
+drop  database sipar;
+create database sipar;
+use sipar;
+
+CREATE TABLE IF NOT EXISTS `sipar`.`Puestos` (
+  `idPuesto` INT(11) NOT NULL AUTO_INCREMENT,
+  `estadoPuesto` TINYINT(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (`idPuesto`))
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8
+COLLATE = utf8_general_ci;
+
+CREATE TABLE IF NOT EXISTS `sipar`.`Tarifas` (
+  `idTarifa` INT(11) NOT NULL AUTO_INCREMENT,
+  `monto` FLOAT(11) NOT NULL,
+  PRIMARY KEY (`idTarifa`))
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8
+COLLATE = utf8_general_ci;
+
+CREATE TABLE IF NOT EXISTS `sipar`.`Vehiculos` (
+  `placa` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`placa`))
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8
+COLLATE = utf8_general_ci;
+
+CREATE TABLE IF NOT EXISTS `sipar`.`Contratos` (
+`idContrato` INT(11) NOT NULL AUTO_INCREMENT,
+  `placa` VARCHAR(10) NOT NULL,
+  `fechaContrato` DATE NOT NULL,
+  `idTarifa` INT(11) NOT NULL,
+   `monto` FLOAT(11) NOT NULL,
+  PRIMARY KEY (idContrato),
+    CONSTRAINT `Contratos_1`
+    FOREIGN KEY (`placa`)
+    REFERENCES `sipar`.`Vehiculos` (`placa`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+    CONSTRAINT `Contratos_2`
+    FOREIGN KEY (`idTarifa`)
+    REFERENCES `sipar`.`Tarifas` (`idTarifa`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8
+COLLATE = utf8_general_ci;
+
+CREATE TABLE IF NOT EXISTS `sipar`.`Movimientos` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `placa` VARCHAR(10) NOT NULL,
+  `idPuesto` INT(11) NOT NULL,
+  `idTarifa` INT(11) NOT NULL,
+  `horaEntrada` DATETIME NOT NULL,
+  `horaSalida` DATETIME NOT NULL,
+  `monto` FLOAT(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `Movimientos_1`
+    FOREIGN KEY (`placa`)
+    REFERENCES `sipar`.`Vehiculos` (`placa`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `Movimientos_2`
+    FOREIGN KEY (`idPuesto`)
+    REFERENCES `sipar`.`Puestos` (`idPuesto`)
+    ON DELETE NO ACTION
+    ON UPDATE CASCADE,
+  CONSTRAINT `Parqueadero_3`
+    FOREIGN KEY (`idTarifa`)
+    REFERENCES `sipar`.`Tarifas` (`idTarifa`)
+    ON DELETE NO ACTION
+    ON UPDATE CASCADE)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8
+COLLATE = utf8_general_ci;
+
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+
+insert into tarifas (
+
+
+
+delimiter //
+CREATE procedure puestos(in numer int(11))
+begin
+declare v int;
+SET v =1;
+while v <= numer do
+insert into Puestos values (v,1);
+SET v = v +1 ;
+end while;
+end //
+
+delimiter $$
+create procedure tarifas (in tarmi float(11), in tarme float(11))
+begin
+update tarifas set monto=tarmi
+where idTarifa=1;
+update tarifas set monto=tarme
+where idTarifa=2;
+end$$
+
+delimiter $$
+create procedure entradauno (in pla varchar(45))
+begin 
+declare v , c,d int;
+declare p varchar(45);
+set v= (select idPuesto from puestos where estadoPuesto=1 limit 1);
+update puestos set estadoPuesto=0 where idPuesto=v;
+set c= (select idContrato from contratos where placa=pla);
+IF c is null then
+set d=1;
+else
+set d=2;
+end IF;
+set p= (select* from vehiculos where placa=pla);
+IF p is null then
+insert into vehiculos (placa) values (pla);
+end IF;
+insert into movimientos 
+( placa, idPuesto, idTarifa, horaEntrada) values (pla,v,d,now());
+end$$
+
+delimiter $$
+create procedure salidauno (in pla varchar(45))
+begin 
+declare m ,p, t int;
+declare hf varchar(45);
+declare he datetime;
+declare tar float;
+declare sal float;
+set m= (select id from movimientos where placa=pla order by id desc limit 0,1);
+set p= (select idPuesto from movimientos where id=m);
+set t= (select idTarifa from movimientos where id=m);
+set he=(select horaEntrada from movimientos where id=m);
+set tar=(select monto from tarifas where idTarifa=t);
+set sal=(SELECT  ((TIMEDIFF(now(),he)*0.01)));
+IF t=1 then
+update movimientos set horaSalida=now() where id=m;
+update movimientos set monto= FORMAT((tar*sal),2) where id=m;
+update puestos set estadoPuesto=1 where idPuesto=p;
+else
+update movimientos set horaSalida=hf,
+monto=0 where id=m;
+update puestos set estadoPuesto=1 where idPuesto=p;
+end IF;
+end$$
+
+delimiter //
+CREATE procedure puestosb()
+begin
+declare e,p int;
+SET e = (select count(idPuesto) from puestos);
+SET p=1;
+while p <= e do
+delete from puestos where  idPuesto=v;
+SET p = p +1 ;
+end while;
+end //
+
+
+select placa,idPuesto,idTarifa,horaEntrada,horaSalida, monto from movimientos where idTarifa=1;
+
+DESCRIBE contratos;
+DESCRIBE movimientos;
+describe puestos;
+describe tarifas;              
+describe vehiculos;
+
+select* from puestos;
+select* from tarifas;
+select* from vehiculos;
+select* from contratos;
+select* from movimientos;
+
+drop procedure salidauno;
+call entradauno('awg 536')
+call salidauno('awg 536');
+call puestos (10)
+call puestosb ( )
+
+select idPuesto  from movimientos where placa='jjj 123' order by id desc limit 0,1
+
+
+select horaEntrada,horaSalida, monto from movimientos where idTarifa=1
+
+select placa,idPuesto,idTarifa,horaEntrada,horaSalida, monto from movimientos where idTarifa=1 and placa like'%f%'
+
+delete from puestos;
+
+select count(idPuesto) from puestos
+
+
+
+drop procedure puestos
+call puestosb( );
+call puestos(5);
